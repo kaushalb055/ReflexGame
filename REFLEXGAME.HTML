@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Reflex Rush</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: #1a1a1a;
+            color: #fff;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+        #start-screen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 10;
+        }
+        .start-btn {
+            padding: 20px 40px;
+            font-size: 24px;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(255, 255, 0, 0.8);
+            animation: glow 1.5s infinite alternate;
+        }
+        #single-player { background: linear-gradient(45deg, #0f0, #9f0); }
+        #with-dares { background: linear-gradient(45deg, #ff0, #f90); }
+        #without-dares { background: linear-gradient(45deg, #0ff, #09f); }
+        #signal {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            background: #333;
+            text-shadow: 0 0 5px #fff;
+            transition: all 0.3s;
+        }
+        #signal.go { background: #0f0; animation: pulse 0.4s infinite; }
+        #signal.fake { background: #ff0; }
+        .player-btn {
+            flex: 1;
+            width: 100%;
+            padding: 50px;
+            font-size: 30px;
+            border: none;
+            color: #fff;
+            opacity: 0.6;
+            transition: opacity 0.2s, transform 0.1s;
+        }
+        .player-btn.active { opacity: 1; }
+        .player-btn:active { transform: scale(0.95); }
+        #player1 { background: #00f; }
+        #player2 { background: #f00; }
+        #result {
+            position: absolute;
+            top: 15%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 28px;
+            text-align: center;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.9);
+            border-radius: 10px;
+            display: none;
+            box-shadow: 0 0 15px #fff;
+            max-width: 90%;
+        }
+        #score {
+            position: absolute;
+            top: 5%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 20px;
+            padding: 5px 15px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 20px;
+        }
+        .dare { font-size: 20px; color: #ff0; margin-top: 10px; }
+        #ok-btn {
+            margin-top: 15px;
+            padding: 10px 20px;
+            font-size: 20px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(45deg, #0f0, #9f0);
+            color: #fff;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.8);
+            transition: transform 0.1s;
+        }
+        #ok-btn:active { transform: scale(0.95); }
+        @keyframes pulse { 50% { transform: scale(1.1); } }
+        @keyframes glow { 100% { box-shadow: 0 0 20px rgba(255, 255, 0, 0.8); } }
+        @keyframes confetti {
+            0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+        }
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            pointer-events: none;
+            z-index: 20;
+        }
+    </style>
+</head>
+<body>
+    <div id="start-screen">
+        <button id="single-player" class="start-btn">Single Player</button>
+        <button id="with-dares" class="start-btn">With Friend (Dares)</button>
+        <button id="without-dares" class="start-btn">With Friend (No Dares)</button>
+    </div>
+    <div id="signal">Get Ready...</div>
+    <button id="player1" class="player-btn" disabled>Player 1</button>
+    <button id="player2" class="player-btn" disabled>Player 2</button>
+    <div id="result"></div>
+    <div id="score">P1: 0 | P2: 0 | Best: -</div>
+
+    <script>
+        const startScreen = document.getElementById('start-screen');
+        const singlePlayerBtn = document.getElementById('single-player');
+        const withDaresBtn = document.getElementById('with-dares');
+        const withoutDaresBtn = document.getElementById('without-dares');
+        const signal = document.getElementById('signal');
+        const player1Btn = document.getElementById('player1');
+        const player2Btn = document.getElementById('player2');
+        const resultDiv = document.getElementById('result');
+        const scoreDiv = document.getElementById('score');
+        let startTime, player1Time, player2Time, gameActive = false, mode = '', bestTime = null;
+        let scores = { p1: 0, p2: 0 };
+        let disqualified = { p1: false, p2: false };
+        let gameTimer = null;
+        let fakeTimer = null; // To handle "Not Yet!" timeout
+
+        const dares = [
+            "Do 10 jumping jacks!",
+            "Sing a song out loud!",
+            "Make a silly face for 10 seconds!",
+            "Dance like nobody’s watching!",
+            "Say 'I’m a slowpoke' 3 times!",
+            "Hop on one foot for 5 seconds!",
+            "Give the winner a compliment!",
+            "Bark like a dog twice!",
+            "Spin around 3 times!",
+            "Tell a bad joke!"
+        ];
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(freq, duration) {
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            osc.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        function updateScore() {
+            scoreDiv.textContent = `P1: ${scores.p1} | P2: ${scores.p2} | Best: ${bestTime ? bestTime + 'ms' : '-'}`;
+        }
+
+        function confettiBurst() {
+            for (let i = 0; i < 30; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = `${Math.random() * 100}vw`;
+                confetti.style.background = `hsl(${Math.random() * 360}, 100%, 50%)`;
+                confetti.style.animation = `confetti ${1 + Math.random()}s linear`;
+                document.body.appendChild(confetti);
+                setTimeout(() => confetti.remove(), 2000);
+            }
+        }
+
+        function getRandomDare() {
+            return dares[Math.floor(Math.random() * dares.length)];
+        }
+
+        function handleStart(selectedMode) {
+            return function(e) {
+                e.preventDefault();
+                mode = selectedMode;
+                startScreen.style.display = 'none';
+                player1Btn.disabled = false;
+                player2Btn.disabled = false;
+                player1Btn.classList.remove('active');
+                player2Btn.classList.remove('active');
+                resultDiv.style.display = 'none';
+                if (mode === 'single') {
+                    player2Btn.style.display = 'none';
+                    player1Btn.textContent = 'Tap!';
+                } else {
+                    player2Btn.style.display = 'block';
+                    player1Btn.textContent = 'Player 1';
+                }
+                countdown(3);
+            };
+        }
+
+        singlePlayerBtn.addEventListener('touchstart', handleStart('single'));
+        singlePlayerBtn.addEventListener('click', handleStart('single'));
+        withDaresBtn.addEventListener('touchstart', handleStart('with-dares'));
+        withDaresBtn.addEventListener('click', handleStart('with-dares'));
+        withoutDaresBtn.addEventListener('touchstart', handleStart('without-dares'));
+        withoutDaresBtn.addEventListener('click', handleStart('without-dares'));
+
+        function countdown(seconds) {
+            let count = seconds;
+            signal.textContent = count;
+            const interval = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    signal.textContent = count;
+                    playSound(400, 0.1);
+                    if ('vibrate' in navigator) navigator.vibrate(100);
+                } else {
+                    clearInterval(interval);
+                    startGame();
+                }
+            }, 1000);
+        }
+
+        function startGame() {
+            signal.textContent = 'Wait...';
+            const delay = Math.random() * 4000 + 1000;
+            if (Math.random() > 0.7) {
+                fakeTimer = setTimeout(() => {
+                    if (!disqualified.p1 && !disqualified.p2) {
+                        signal.textContent = 'Not Yet!';
+                        signal.classList.add('fake');
+                        setTimeout(() => signal.classList.remove('fake'), 300);
+                    }
+                }, delay / 2);
+            }
+            gameTimer = setTimeout(() => {
+                if (!disqualified.p1 && !disqualified.p2) {
+                    signal.textContent = 'GO!';
+                    signal.classList.add('go');
+                    playSound(800, 0.2);
+                    if ('vibrate' in navigator) navigator.vibrate(500);
+                    startTime = Date.now();
+                    gameActive = true;
+                    player1Btn.classList.add('active');
+                    if (mode !== 'single') player2Btn.classList.add('active');
+                }
+            }, delay);
+        }
+
+        function handlePlayer1(e) {
+            e.preventDefault();
+            if (!gameActive && !disqualified.p1) {
+                disqualified.p1 = true;
+                playSound(200, 0.3);
+                clearTimeout(gameTimer);
+                clearTimeout(fakeTimer);
+                signal.textContent = 'Oops!';
+                if (mode === 'single') showResult('Disqualified! You tapped too early.');
+                else checkWinner();
+            } else if (gameActive && !player1Time && !disqualified.p1) {
+                player1Time = Date.now() - startTime;
+                if (mode === 'single') checkSinglePlayer();
+                else checkWinner();
+            }
+        }
+
+        function handlePlayer2(e) {
+            e.preventDefault();
+            if (!gameActive && !disqualified.p2) {
+                disqualified.p2 = true;
+                playSound(200, 0.3);
+                clearTimeout(gameTimer);
+                clearTimeout(fakeTimer);
+                signal.textContent = 'Oops!';
+                checkWinner();
+            } else if (gameActive && !player2Time && !disqualified.p2) {
+                player2Time = Date.now() - startTime;
+                checkWinner();
+            }
+        }
+
+        player1Btn.addEventListener('touchstart', handlePlayer1);
+        player1Btn.addEventListener('click', handlePlayer1);
+        player2Btn.addEventListener('touchstart', handlePlayer2);
+        player2Btn.addEventListener('click', handlePlayer2);
+
+        function checkSinglePlayer() {
+            gameActive = false;
+            signal.classList.remove('go');
+            signal.textContent = 'Done!';
+            if (!bestTime || player1Time < bestTime) bestTime = player1Time;
+            updateScore();
+            showResult(`Your Time: ${player1Time}ms<br>Best: ${bestTime}ms`);
+            playSound(1000, 0.3);
+            confettiBurst();
+            if ('vibrate' in navigator) navigator.vibrate([200, 100, 200]);
+        }
+
+        function showResult(message) {
+            resultDiv.innerHTML = `${message}<br><button id="ok-btn">OK</button>`;
+            resultDiv.style.display = 'block';
+            const okBtn = document.getElementById('ok-btn');
+            okBtn.addEventListener('click', returnToStart);
+            okBtn.addEventListener('touchstart', returnToStart);
+            resetGame();
+        }
+
+        function checkWinner() {
+            if ((player1Time || disqualified.p1) && (player2Time || disqualified.p2)) {
+                gameActive = false;
+                signal.classList.remove('go');
+                signal.textContent = disqualified.p1 && disqualified.p2 ? 'Oops!' : 'Done!';
+                let resultText = '';
+                if (disqualified.p1 && disqualified.p2) {
+                    resultText = `Both disqualified! You tapped too early.`;
+                } else if (disqualified.p1) {
+                    scores.p2++;
+                    resultText = `Player 2 wins!<br>Player 1 disqualified (too early).`;
+                } else if (disqualified.p2) {
+                    scores.p1++;
+                    resultText = `Player 1 wins!<br>Player 2 disqualified (too early).`;
+                } else {
+                    const winner = player1Time < player2Time ? 'Player 1' : 'Player 2';
+                    const loser = winner === 'Player 1' ? 'Player 2' : 'Player 1';
+                    if (winner === 'Player 1') scores.p1++; else scores.p2++;
+                    resultText = `${winner} wins!<br>P1: ${player1Time}ms | P2: ${player2Time}ms`;
+                    if (mode === 'with-dares') {
+                        const dare = getRandomDare();
+                        resultText += `<br><span class="dare">${loser}’s Dare: ${dare}</span>`;
+                    }
+                    playSound(winner === 'Player 1' ? 1000 : 1200, 0.3);
+                    confettiBurst();
+                    if ('vibrate' in navigator) navigator.vibrate([200, 100, 200]);
+                }
+                updateScore();
+                showResult(resultText);
+            }
+        }
+
+        function returnToStart(e) {
+            e.preventDefault();
+            resultDiv.style.display = 'none';
+            startScreen.style.display = 'flex';
+        }
+
+        function resetGame() {
+            player1Time = null;
+            player2Time = null;
+            disqualified.p1 = false;
+            disqualified.p2 = false;
+            gameActive = false;
+            player1Btn.disabled = true;
+            player2Btn.disabled = true;
+            signal.classList.remove('go', 'fake');
+            signal.textContent = 'Get Ready...';
+            if (gameTimer) clearTimeout(gameTimer);
+            if (fakeTimer) clearTimeout(fakeTimer);
+            gameTimer = null;
+            fakeTimer = null;
+        }
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'924e3eabdbf5b0e2',t:'MTc0MjczNjEyOC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+</body>
+</html>
