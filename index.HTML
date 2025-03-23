@@ -7,7 +7,6 @@
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
-
   gtag('config', 'G-825JPWLNZJ');
 </script>
     <meta charset="UTF-8">
@@ -32,17 +31,20 @@
             transform: translate(-50%, -50%);
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 2vh;
             z-index: 10;
+            width: 90%;
+            max-width: 400px;
         }
         .start-btn {
-            padding: 20px 40px;
-            font-size: 24px;
+            padding: 3vw 6vw;
+            font-size: clamp(16px, 5vw, 24px);
             border: none;
-            border-radius: 15px;
+            border-radius: 10px;
             cursor: pointer;
             box-shadow: 0 0 10px rgba(255, 255, 0, 0.8);
             animation: glow 1.5s infinite alternate;
+            width: 100%;
         }
         #single-player { background: linear-gradient(45deg, #0f0, #9f0); }
         #with-dares { background: linear-gradient(45deg, #ff0, #f90); }
@@ -52,18 +54,19 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 40px;
+            font-size: clamp(24px, 8vw, 40px);
             background: #333;
             text-shadow: 0 0 5px #fff;
             transition: all 0.3s;
+            min-height: 20vh;
         }
         #signal.go { background: #0f0; animation: pulse 0.4s infinite; }
         #signal.fake { background: #ff0; }
         .player-btn {
             flex: 1;
             width: 100%;
-            padding: 50px;
-            font-size: 30px;
+            padding: clamp(20px, 10vh, 50px);
+            font-size: clamp(20px, 6vw, 30px);
             border: none;
             color: #fff;
             opacity: 0.6;
@@ -78,30 +81,36 @@
             top: 15%;
             left: 50%;
             transform: translateX(-50%);
-            font-size: 28px;
+            font-size: clamp(18px, 5vw, 28px);
             text-align: center;
-            padding: 15px;
+            padding: 2vh 3vw;
             background: rgba(0, 0, 0, 0.9);
             border-radius: 10px;
             display: none;
             box-shadow: 0 0 15px #fff;
             max-width: 90%;
+            width: auto;
         }
         #score {
             position: absolute;
-            top: 5%;
+            top: 2vh;
             left: 50%;
             transform: translateX(-50%);
-            font-size: 20px;
-            padding: 5px 15px;
+            font-size: clamp(14px, 4vw, 20px);
+            padding: 1vh 2vw;
             background: rgba(0, 0, 0, 0.7);
             border-radius: 20px;
+            white-space: nowrap;
         }
-        .dare { font-size: 20px; color: #ff0; margin-top: 10px; }
+        .dare { 
+            font-size: clamp(14px, 4vw, 20px); 
+            color: #ff0; 
+            margin-top: 1.5vh; 
+        }
         #ok-btn {
-            margin-top: 15px;
-            padding: 10px 20px;
-            font-size: 20px;
+            margin-top: 2vh;
+            padding: 1.5vh 3vw;
+            font-size: clamp(16px, 4vw, 20px);
             border: none;
             border-radius: 10px;
             background: linear-gradient(45deg, #0f0, #9f0);
@@ -119,10 +128,17 @@
         }
         .confetti {
             position: absolute;
-            width: 10px;
-            height: 10px;
+            width: 1vw;
+            height: 1vw;
             pointer-events: none;
             z-index: 20;
+        }
+        @media (max-width: 600px) {
+            #start-screen { gap: 1.5vh; }
+            .start-btn { padding: 2.5vh 5vw; }
+            #signal { min-height: 15vh; }
+            .player-btn { padding: clamp(15px, 8vh, 40px); }
+            #result { padding: 1.5vh 2vw; }
         }
     </style>
 </head>
@@ -139,6 +155,7 @@
     <div id="score">P1: 0 | P2: 0 | Best: -</div>
 
     <script>
+        // JavaScript remains unchanged as per your instructions
         const startScreen = document.getElementById('start-screen');
         const singlePlayerBtn = document.getElementById('single-player');
         const withDaresBtn = document.getElementById('with-dares');
@@ -152,7 +169,7 @@
         let scores = { p1: 0, p2: 0 };
         let disqualified = { p1: false, p2: false };
         let gameTimer = null;
-        let fakeTimer = null; // To handle "Not Yet!" timeout
+        let fakeTimer = null;
 
         const dares = [
             "Do 10 jumping jacks!",
